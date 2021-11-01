@@ -1,0 +1,106 @@
+version: "3.8"
+
+services:
+  ckan-dev:
+    container_name: ckan
+    restart: always
+    image: ${CKAN_SERVICE_IMAGE}
+    command: /bin/sh /usr/lib/ckan/scripts/start_ckan_development.sh
+    env_file:
+      - .env
+    ports:
+      - "0.0.0.0:${CKAN_PORT}:5000"
+    volumes:
+      - ./src:/usr/lib/ckan/venv/src/extensions/
+      - ckan_storage:/tmp
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+    networks:
+      main:
+        aliases:
+          - ckan
+
+  dbsql:
+    image: mysql:5.7
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "3306:3306"
+    expose:
+      - "3306"
+    volumes:
+      - my-db:/var/lib/mysql
+    networks:
+      main:
+        aliases:
+          - mysql
+
+  db:
+    container_name: db
+    env_file:
+      - .env
+    build:
+      context: postgresql/
+      args:
+        - DATASTORE_READONLY_PASSWORD=${DATASTORE_READONLY_PASSWORD}
+        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data_510:/var/lib/postgresql/data/510
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ckan"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      main:
+        aliases:
+          - db
+
+  solr:
+    container_name: solr
+    build:
+      context: solr/
+    volumes:
+      - solr_data:/opt/solr/server/solr/ckan/data/index
+    ports:
+      - "8983:8983"
+    networks:
+      main:
+        aliases:
+          - solr
+
+  redis:
+    container_name: redis
+    image: redis:6.2
+    networks:
+      main:
+        aliases:
+          - redis
+
+  datapusher:
+    container_name: datapusher
+    build:
+      context: datapusher/
+      args:
+        - DATAPUSHER_SSL_VERIFY=${DATAPUSHER_SSL_VERIFY}
+        - DATAPUSHER_SQLALCHEMY_DATABASE_URI=${DATAPUSHER_SQLALCHEMY_DATABASE_URI}
+    ports:
+      - "8800:8800"
+
+volumes:
+  ckan_storage:
+  pg_data_510:
+  solr_data:
+  my-db:
+
+networks:
+  main:

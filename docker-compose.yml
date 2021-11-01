@@ -5,7 +5,6 @@ services:
     container_name: ckan
     restart: always
     image: ${CKAN_SERVICE_IMAGE}
-    command: /bin/sh /usr/lib/ckan/scripts/start_ckan_development.sh
     env_file:
       - .env
     ports:
@@ -70,11 +69,21 @@ services:
 
   redis:
     container_name: redis
-    image: redis:alpine
+    image: redis:6.2
     networks:
       main:
         aliases:
           - redis
+
+  datapusher:
+    container_name: datapusher
+    build:
+      context: datapusher/
+      args:
+        - DATAPUSHER_SSL_VERIFY=${DATAPUSHER_SSL_VERIFY}
+        - DATAPUSHER_SQLALCHEMY_DATABASE_URI=${DATAPUSHER_SQLALCHEMY_DATABASE_URI}
+    ports:
+      - "8800:8800"
 
 volumes:
   ckan_storage:
